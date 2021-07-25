@@ -1,6 +1,6 @@
 import abc
 from typing import (
-    Callable, Iterable, Optional, Sequence, TypeVar, Union, overload,
+    Callable, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union, overload,
 )
 
 import click
@@ -178,6 +178,13 @@ class Constraint(abc.ABC):
     def hidden(self) -> 'Rephraser':
         """Hides this constraint from the command help."""
         return Rephraser(self, help='')
+
+    def format_usage_pieces(self, pieces: List[Tuple[str]]) -> str:
+        """Creates a string combining the given usage pieces.
+        
+        The default implementation places options in brackets.
+        """
+        return ' '.join(['[' + ' '.join(piece) + ']' for piece in pieces])
 
     def __call__(self, *param_adders: Decorator) -> Callable[[F], F]:
         """Equivalent to calling :func:`cloup.constrained_params` with this
@@ -413,6 +420,14 @@ class _RequireAll(Constraint):
                 params=params,
             )
 
+class NoOp(Constraint):
+    """Constraint subclass which accepts any set of parameters."""
+
+    def help(self, *args, **kwargs) -> str:
+        return ''
+
+    def check_values(self, *args, **kwargs):
+        return super().check_values(*args, **kwargs)
 
 class RequireAtLeast(Constraint):
     """Satisfied if the number of set parameters is >= n."""
@@ -550,3 +565,6 @@ require_any = RequireAtLeast(1)
 
 require_one = RequireExactly(1)
 """Alias for ``RequireExactly(1)``."""
+
+no_op = NoOp()
+"""Always satisfied."""

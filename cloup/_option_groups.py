@@ -8,10 +8,11 @@ from typing import (
 
 import click
 from click import Option, Parameter
+from click.core import Context
 
 from cloup._params import option
 from cloup._util import first_bool, make_repr
-from cloup.constraints import Constraint
+from cloup.constraints import Constraint, no_op
 from cloup.formatting import HelpSection, ensure_is_cloup_formatter
 from cloup.typing import Decorator, F
 
@@ -36,7 +37,7 @@ class OptionGroup:
         self.title = title
         self.help = help
         self._options: Sequence[click.Option] = []
-        self.constraint = constraint
+        self._constraint = constraint
         self.hidden = hidden
 
     @property
@@ -52,12 +53,34 @@ class OptionGroup:
         elif all(opt.hidden for opt in opts):
             self.hidden = True
 
+    @property
+    def constraint(self) -> Constraint:
+        if self._constraint is None:
+            return no_op
+        return self._constraint
+
+    @constraint.setter
+    def constraint(self, constraint: Constraint) -> None:
+        self._constraint = constraint
+
     def get_help_records(self, ctx: click.Context) -> List[Tuple[str, str]]:
         if self.hidden:
             return []
         return [
             opt.get_help_record(ctx) for opt in self if not opt.hidden  # type: ignore
         ]  # get_help_record() should return None only if opt.hidden
+
+    def usage_string(self, ctx: Context):
+        """A usage string representing this group of options along with its constraint, if any."""
+        if self.hidden or self.constraint is None:
+            return ''
+        return self.constraint.format_usage_pieces(
+            self.all_usage_pieces(ctx)
+        )
+
+    def all_usage_pieces(self, ctx: Context) -> List[Tuple[str]]:
+        """Create a list of usage piece tuples representing each option in this group."""
+        return [tuple(opt.get_help_record(ctx)[:1]) for opt in self.options if not opt.hidden]
 
     def option(self, *param_decls, **attrs) -> Callable[[F], F]:
         """Refer to :func:`cloup.option`."""
